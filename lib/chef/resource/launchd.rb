@@ -29,12 +29,6 @@ class Chef
       default_action :create
       allowed_actions :create, :create_if_missing, :delete, :enable, :disable
 
-      def initialize(name, run_context = nil)
-        super
-        provider = Chef::Provider::Launchd
-        resource_name = :launchd
-      end
-
       property :label, String, default: lazy { name }, identity: true
       property :backup, [Integer, FalseClass]
       property :cookbook, String
@@ -57,11 +51,14 @@ class Chef
       # will not just run on midnight of Sat and Sun, rather it will run _every_ midnight.
       property :start_calendar_interval, [Hash, Array], coerce: proc { |type|
         # Coerce into an array of hashes to make validation easier
-        array = type   if type.is_a?(Array)
-        array = [type] unless array
+        array = if type.is_a?(Array)
+                  type
+                else
+                  [type]
+                end
 
         # Check to make sure that our array only has hashes
-        if array.any? { |obj| !obj.is_a?(Hash) }
+        unless array.all? { |obj| obj.is_a?(Hash) }
           error_msg = "start_calendar_interval must be a single hash or an array of hashes!"
           raise Chef::Exceptions::ValidationFailed, error_msg
         end
@@ -70,12 +67,12 @@ class Chef
         array.each do |entry|
           allowed_keys = %w{Minute Hour Day Weekday Month}
           error_msg = "Invalid key for start_calendar_interval, must be one of: #{allowed_keys.join(", ")}"
-          if entry.keys.any? { |key| !allowed_keys.include?(key) }
+          unless entry.keys.all? { |key| allowed_keys.include?(key) }
             raise Chef::Exceptions::ValidationFailed, error_msg
           end
 
           error_msg = "Invalid value for start_calendar_interval item.  Values must be integers!"
-          if entry.values.any? { |val| !val.is_a?(Fixnum) }
+          unless entry.values.all? { |val| val.is_a?(Fixnum) }
             raise Chef::Exceptions::ValidationFailed, error_msg
           end
         end
